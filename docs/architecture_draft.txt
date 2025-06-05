@@ -1,0 +1,42 @@
+ai-interview-simulator/
+├── frontend/                       # React frontend
+│   ├── public/                    # Static assets
+│   ├── src/                       # React components, WebSocket logic
+│   ├── package.json               # Node.js dependencies
+│   └── tsconfig.json              # TypeScript configuration
+├── services/                      # Backend microservices
+│   ├── user_service/              # User Management Service (Python)
+│   │   ├── src/                  # Python source code (OOP modules)
+│   │   ├── tests/                # Unit and integration tests
+│   │   ├── requirements.txt       # Python dependencies
+│   │   └── Dockerfile            # Service-specific Docker config
+│   ├── interaction_service/       # Interview Interaction Service (STT, TTS, Conversational AI, Coding Agent)
+│   │   ├── src/                  # Python source code (OOP modules)
+│   │   ├── tests/                # Unit and integration tests
+│   │   ├── requirements.txt       # Python dependencies
+│   │   └── Dockerfile
+│   ├── structure_service/         # Interview Structure Service (Time Management, Checklist)
+│   │   ├── src/                  # Python source code (OOP modules)
+│   │   ├── tests/                # Unit and integration tests
+│   │   ├── requirements.txt       # Python dependencies
+│   │   └── Dockerfile
+│   └── sentiment_service/         # Facial Sentiment Analysis Service
+│       ├── src/                  # Python source code (OOP modules)
+│       ├── tests/                # Unit and integration tests
+│       ├── requirements.txt       # Python dependencies
+│       └── Dockerfile
+├── shared/                        # Shared utilities across services
+│   ├── api_types/                # TypeScript (frontend) and Pydantic (backend) API schemas
+│   ├── websocket_utils/          # Reusable WebSocket client/server logic
+│   └── ai_utils/                 # Shared AI client helpers (e.g., Hugging Face, OpenCV)
+├── infrastructure/                # Deployment and infrastructure configs
+│   ├── docker-compose.yml        # Local dev setup (Redis, PostgreSQL, Nginx)
+│   ├── nginx.conf                # Nginx reverse proxy configuration
+│   └── .env.example              # Sample environment variables
+├── docs/                         # Additional project documentation
+│   ├── architecture.md           # System architecture overview
+│   └── api.md                   # API documentation
+├── tests/                        # End-to-end tests across services
+├── .gitignore                    # Git ignore file
+├── README.md                     # Project overview
+└── pyproject.toml                # Project-wide Python configuration (optional)
