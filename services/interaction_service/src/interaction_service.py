@@ -10,11 +10,12 @@ It includes the following classes:
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
-from enum import Enum
 import asyncio
+from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
+from typing import Dict, Optional, Any
+
 
 class InterviewState(Enum):
     IDLE = "idle"
@@ -65,7 +66,20 @@ class ConversationManager(ABC):
         """Evaluate user's response."""
         pass
 
+class InterviewSummarizer(ABC):
+    @abstractmethod
+    async def summarize_interview(self, context: InterviewContext) -> str:
+        """Summarize the interview."""
+        pass
+
 class InterviewInteractionService:
+    """
+    This class is responsible for managing the interview process.
+    It includes the following methods:
+    - start_interview: Start a new interview session
+    - process_user_input: Process user input and generate response
+    - end_interview: End an interview session and return summary
+    """
     def __init__(
         self,
         speech_processor: SpeechProcessor,
@@ -79,7 +93,7 @@ class InterviewInteractionService:
 
     async def start_interview(self, user_id: str, interview_type: str) -> str:
         """Start a new interview session."""
-        interview_id = f"{user_id}_{datetime.now().timestamp()}"
+        interview_id = f"{user_id}_{datetime.now().timestamp()}"  # TODO: Implement an objectively unique interview ID generation
         context = InterviewContext(
             interview_id=interview_id,
             user_id=user_id,
