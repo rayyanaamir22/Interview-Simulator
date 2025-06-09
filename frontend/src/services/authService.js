@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3001'; // User service URL
+const API_URL = 'http://localhost:8000'; // User service URL
 
 const authService = {
   async login(email, password) {

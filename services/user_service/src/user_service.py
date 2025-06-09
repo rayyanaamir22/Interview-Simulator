@@ -1,9 +1,23 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 import uuid
 
 app = FastAPI()
+
+origins = [
+    "http://localhost",
+    "http://localhost:5173", # Your frontend application
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class User(BaseModel):
     id: str
@@ -13,8 +27,20 @@ class User(BaseModel):
     created_interactions: List[str] = []
     created_structures: List[str] = []
 
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
 # In-memory storage for users (will be replaced by database service)
 users = {}
+
+@app.post("/auth/login")
+async def login(request: LoginRequest):
+    # For demonstration, replace with actual authentication logic
+    if request.email == "test@example.com" and request.password == "password":
+        # In a real application, you would generate a proper JWT token
+        return {"message": "Login successful", "token": "dummy_jwt_token", "user_id": "some_user_id"}
+    raise HTTPException(status_code=401, detail="Invalid credentials")
 
 @app.post("/users/", response_model=User)
 async def create_user(username: str, email: str):

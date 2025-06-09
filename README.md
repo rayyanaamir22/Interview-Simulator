@@ -22,6 +22,15 @@ This will:
 - Frontend will be available at http://localhost:5173
 - API docs will be available at their respective ports (see below)
 
+## 🛑 Stopping Services
+To stop all running services, you can use the following command:
+
+```bash
+pkill -f "uvicorn|npm run dev"
+```
+
+This will terminate all running uvicorn (backend) and npm (frontend) processes. If you need to stop services individually, you can use Ctrl+C in their respective terminal windows.
+
 ## 🔧 Manual Setup (Alternative)
 If you prefer to start services individually or need to run them separately:
 
