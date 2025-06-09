@@ -7,7 +7,6 @@ It includes the following classes:
 - InterviewStructureService: Class for managing interview structure and timing
 """
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
