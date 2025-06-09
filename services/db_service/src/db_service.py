@@ -3,7 +3,7 @@ Database utils
 """
 
 from fastapi import FastAPI, HTTPException, Depends
-from sqlalchemy import create_engine, Column, String, JSON, ARRAY
+from sqlalchemy import create_engine, Column, String, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from pydantic import BaseModel
@@ -26,8 +26,8 @@ class UserModel(Base):
     username = Column(String, unique=True, nullable=False)
     email = Column(String, unique=True, nullable=False)
     preferences = Column(JSON, default={})
-    created_interactions = Column(ARRAY(String), default=[])
-    created_structures = Column(ARRAY(String), default=[])
+    created_interactions = Column(JSON, default=list)
+    created_structures = Column(JSON, default=list)
 
 # Pydantic model for request/response
 class UserBase(BaseModel):
@@ -88,8 +88,10 @@ async def add_user_interaction(user_id: str, interaction_id: str, db: Session = 
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     
-    if interaction_id not in user.created_interactions:
-        user.created_interactions.append(interaction_id)
+    interactions = user.created_interactions or []
+    if interaction_id not in interactions:
+        interactions.append(interaction_id)
+        user.created_interactions = interactions
         db.commit()
     return {"message": "Interaction added successfully"}
 
@@ -99,7 +101,9 @@ async def add_user_structure(user_id: str, structure_id: str, db: Session = Depe
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     
-    if structure_id not in user.created_structures:
-        user.created_structures.append(structure_id)
+    structures = user.created_structures or []
+    if structure_id not in structures:
+        structures.append(structure_id)
+        user.created_structures = structures
         db.commit()
     return {"message": "Structure added successfully"} 
