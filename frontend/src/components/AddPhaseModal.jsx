@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const PHASE_TYPES = [
   'Introduction',
@@ -9,12 +9,31 @@ const PHASE_TYPES = [
   'Custom'
 ];
 
-const AddPhaseModal = ({ isOpen, onClose, onAdd, position }) => {
+const AddPhaseModal = ({ isOpen, onClose, onAdd, position, initialPhase }) => {
   const [phaseType, setPhaseType] = useState('Introduction');
   const [customName, setCustomName] = useState('');
   const [duration, setDuration] = useState(15);
   const [isSkippable, setIsSkippable] = useState(false);
   const [isShortenable, setIsShortenable] = useState(true);
+
+  useEffect(() => {
+    if (initialPhase) {
+      // If editing an existing phase, set the initial values
+      const isCustom = !PHASE_TYPES.includes(initialPhase.name);
+      setPhaseType(isCustom ? 'Custom' : initialPhase.name);
+      setCustomName(isCustom ? initialPhase.name : '');
+      setDuration(initialPhase.duration);
+      setIsSkippable(initialPhase.isSkippable);
+      setIsShortenable(initialPhase.isShortenable);
+    } else {
+      // Reset to defaults when adding a new phase
+      setPhaseType('Introduction');
+      setCustomName('');
+      setDuration(15);
+      setIsSkippable(false);
+      setIsShortenable(true);
+    }
+  }, [initialPhase, isOpen]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -32,7 +51,9 @@ const AddPhaseModal = ({ isOpen, onClose, onAdd, position }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-4">Add New Phase</h2>
+        <h2 className="text-2xl font-bold mb-4">
+          {initialPhase ? 'Edit Phase' : 'Add New Phase'}
+        </h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-bold mb-2">
@@ -117,7 +138,7 @@ const AddPhaseModal = ({ isOpen, onClose, onAdd, position }) => {
               type="submit"
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              Add Phase
+              {initialPhase ? 'Save Changes' : 'Add Phase'}
             </button>
           </div>
         </form>

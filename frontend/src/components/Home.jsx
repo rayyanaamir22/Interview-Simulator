@@ -3,43 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import AddPhaseModal from './AddPhaseModal';
 
-const PhaseConfig = ({ phase, duration, onDurationChange, onToggleSkippable, onToggleShortenable }) => (
-  <div className="bg-white rounded-lg shadow-lg p-6 mb-4">
-    <div className="flex justify-between items-center mb-4">
-      <h3 className="text-xl font-semibold">{phase}</h3>
-      <div className="flex items-center space-x-4">
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            onChange={onToggleSkippable}
-            className="mr-2"
-          />
-          Skippable
-        </label>
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            onChange={onToggleShortenable}
-            className="mr-2"
-          />
-          Shortenable
-        </label>
-      </div>
-    </div>
-    <div className="flex items-center">
-      <label className="mr-4">Duration (minutes):</label>
-      <input
-        type="number"
-        min="1"
-        value={duration}
-        onChange={(e) => onDurationChange(parseInt(e.target.value))}
-        className="border rounded px-2 py-1 w-20"
-      />
-    </div>
-  </div>
-);
-
-const TimelineVisualization = ({ phases, onPhasesChange, onAddPhase, onDeletePhase }) => {
+const TimelineVisualization = ({ phases, onPhasesChange, onAddPhase, onDeletePhase, onEditPhase }) => {
   const [hoveredPhaseIndex, setHoveredPhaseIndex] = useState(null);
   const [hoveredGapIndex, setHoveredGapIndex] = useState(null);
   
@@ -64,6 +28,23 @@ const TimelineVisualization = ({ phases, onPhasesChange, onAddPhase, onDeletePha
               ref={provided.innerRef}
               className="relative min-h-[400px] w-64"
             >
+              {/* Top gap for adding phase */}
+              <div
+                className="absolute w-64 h-2 -left-4"
+                style={{ top: '0' }}
+                onMouseEnter={() => setHoveredGapIndex(-1)}
+                onMouseLeave={() => setHoveredGapIndex(null)}
+              >
+                {hoveredGapIndex === -1 && (
+                  <button
+                    className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-indigo-600 focus:outline-none"
+                    onClick={() => onAddPhase(0)}
+                  >
+                    +
+                  </button>
+                )}
+              </div>
+
               {phases.map((phase, index) => (
                 <Draggable key={phase.name} draggableId={phase.name} index={index}>
                   {(provided, snapshot) => (
@@ -78,11 +59,12 @@ const TimelineVisualization = ({ phases, onPhasesChange, onAddPhase, onDeletePha
                       onMouseLeave={() => setHoveredPhaseIndex(null)}
                     >
                       <div
-                        className="h-12 rounded flex items-center justify-center text-white font-medium transition-all duration-200"
+                        className="h-12 rounded flex items-center justify-center text-white font-medium transition-all duration-200 cursor-pointer"
                         style={{
                           backgroundColor: getPhaseColor(phase.name),
                           transform: hoveredPhaseIndex === index ? 'translateX(8px)' : 'translateX(0)',
                         }}
+                        onClick={() => onEditPhase(index)}
                       >
                         {phase.name} ({phase.duration}m)
                       </div>
@@ -106,7 +88,7 @@ const TimelineVisualization = ({ phases, onPhasesChange, onAddPhase, onDeletePha
               ))}
               {provided.placeholder}
               
-              {/* Gap hover areas */}
+              {/* Gap hover areas between phases */}
               {phases.map((_, index) => (
                 <div
                   key={`gap-${index}`}
@@ -127,6 +109,23 @@ const TimelineVisualization = ({ phases, onPhasesChange, onAddPhase, onDeletePha
                   )}
                 </div>
               ))}
+
+              {/* Bottom gap for adding phase */}
+              <div
+                className="absolute w-64 h-2 -left-4"
+                style={{ top: `${(phases.length + 1) * 56}px` }}
+                onMouseEnter={() => setHoveredGapIndex(phases.length)}
+                onMouseLeave={() => setHoveredGapIndex(null)}
+              >
+                {hoveredGapIndex === phases.length && (
+                  <button
+                    className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-indigo-600 focus:outline-none"
+                    onClick={() => onAddPhase(phases.length)}
+                  >
+                    +
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </Droppable>
@@ -160,6 +159,7 @@ const Home = () => {
   const [success, setSuccess] = useState(null);
   const [showAddPhaseModal, setShowAddPhaseModal] = useState(false);
   const [newPhaseIndex, setNewPhaseIndex] = useState(null);
+  const [editingPhaseIndex, setEditingPhaseIndex] = useState(null);
 
   const handlePhasesChange = (newPhases) => {
     setPhases(newPhases);
@@ -167,36 +167,33 @@ const Home = () => {
 
   const handleAddPhase = (index) => {
     setNewPhaseIndex(index);
+    setEditingPhaseIndex(null);
+    setShowAddPhaseModal(true);
+  };
+
+  const handleEditPhase = (index) => {
+    setEditingPhaseIndex(index);
+    setNewPhaseIndex(null);
     setShowAddPhaseModal(true);
   };
 
   const handleNewPhase = (newPhase) => {
-    const newPhases = [...phases];
-    newPhases.splice(newPhaseIndex, 0, newPhase);
-    setPhases(newPhases);
+    if (editingPhaseIndex !== null) {
+      // Editing existing phase
+      const newPhases = [...phases];
+      newPhases[editingPhaseIndex] = newPhase;
+      setPhases(newPhases);
+    } else {
+      // Adding new phase
+      const newPhases = [...phases];
+      newPhases.splice(newPhaseIndex, 0, newPhase);
+      setPhases(newPhases);
+    }
   };
 
   const handleDeletePhase = (index) => {
     const newPhases = [...phases];
     newPhases.splice(index, 1);
-    setPhases(newPhases);
-  };
-
-  const handleDurationChange = (index, newDuration) => {
-    const newPhases = [...phases];
-    newPhases[index].duration = newDuration;
-    setPhases(newPhases);
-  };
-
-  const handleToggleSkippable = (index) => {
-    const newPhases = [...phases];
-    newPhases[index].isSkippable = !newPhases[index].isSkippable;
-    setPhases(newPhases);
-  };
-
-  const handleToggleShortenable = (index) => {
-    const newPhases = [...phases];
-    newPhases[index].isShortenable = !newPhases[index].isShortenable;
     setPhases(newPhases);
   };
 
@@ -232,9 +229,6 @@ const Home = () => {
         interviewId: data.interview_id,
         schedule: data.schedule
       });
-      
-      // TODO: In the future, redirect to the interview page
-      console.log('Interview configured:', data);
     } catch (error) {
       setError(error.message);
       console.error('Error starting interview:', error);
@@ -294,20 +288,8 @@ const Home = () => {
               onPhasesChange={handlePhasesChange}
               onAddPhase={handleAddPhase}
               onDeletePhase={handleDeletePhase}
+              onEditPhase={handleEditPhase}
             />
-
-            <div className="space-y-4">
-              {phases.map((phase, index) => (
-                <PhaseConfig
-                  key={phase.name}
-                  phase={phase.name}
-                  duration={phase.duration}
-                  onDurationChange={(duration) => handleDurationChange(index, duration)}
-                  onToggleSkippable={() => handleToggleSkippable(index)}
-                  onToggleShortenable={() => handleToggleShortenable(index)}
-                />
-              ))}
-            </div>
 
             <div className="mt-8 text-center">
               <button
@@ -326,9 +308,13 @@ const Home = () => {
 
       <AddPhaseModal
         isOpen={showAddPhaseModal}
-        onClose={() => setShowAddPhaseModal(false)}
+        onClose={() => {
+          setShowAddPhaseModal(false);
+          setEditingPhaseIndex(null);
+        }}
         onAdd={handleNewPhase}
         position={newPhaseIndex}
+        initialPhase={editingPhaseIndex !== null ? phases[editingPhaseIndex] : null}
       />
     </div>
   );
