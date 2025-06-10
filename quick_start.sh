@@ -30,7 +30,7 @@ start_service "cd frontend && npm run dev"
 # Start backend services
 echo "Starting backend services..."
 start_service "cd services/structure_service && source ../../proto-env/bin/activate && PYTHONPATH=$PYTHONPATH:$(pwd) uvicorn src.main:app --host 0.0.0.0 --port 8002"
-start_service "cd services/interaction_service && source ../../proto-env/bin/activate && PYTHONPATH=$PYTHONPATH:$(pwd) uvicorn src.interaction_service:app --host 0.0.0.0 --port 8003"
+start_service "cd services/interaction_service && source ../../proto-env/bin/activate && PYTHONPATH=$PYTHONPATH:$(pwd) uvicorn src.main:app --host 0.0.0.0 --port 8003"
 
 echo "All services are starting up..."
 echo "Frontend will be available at http://localhost:5173"

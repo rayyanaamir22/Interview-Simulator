@@ -1,218 +1,25 @@
 """
 This module contains the InterviewInteractionService class, which is responsible for managing the interview process.
 It includes the following classes:
-- InterviewState: Enum for the state of the interview
-- InterviewContext: Dataclass for the context of the interview
-- SpeechProcessor: Abstract base class for speech processing
-- SentimentAnalyzer: Abstract base class for sentiment analysis
-- ConversationManager: Abstract base class for conversation management
 - InterviewInteractionService: Class for managing the interview process
 """
 
-from abc import ABC, abstractmethod
 import asyncio
-from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
 from typing import Dict, Optional, Any, List
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+import json
+import logging
+from .sentiment_analyzer import MultiModalSentimentAnalyzer
+from .speech_processor import GoogleCloudSpeechProcessor
+from .conversation_manager import InterviewConversationManager, InterviewContext, InterviewState
+from .interview_summarizer import DefaultInterviewSummarizer
+from .questionnaire import InterviewQuestionnaire
 
-
-class InterviewState(Enum):
-    IDLE = "idle"
-    IN_PROGRESS = "in_progress"
-    PAUSED = "paused"
-    COMPLETED = "completed"
-    ERROR = "error"
-
-@dataclass
-class ChecklistItem:
-    description: str
-    is_completed: bool = False
-    notes: str = ""
-
-@dataclass
-class InterviewContext:
-    interview_id: str
-    user_id: str
-    current_state: InterviewState
-    start_time: datetime
-    current_question_index: int = 0
-    metadata: Dict[str, Any] = None
-    checklist: List[ChecklistItem] = None
-    implicit_thoughts: List[str] = None
-    structure_service_id: Optional[str] = None  # Reference to structure service interview
-
-class SpeechProcessor(ABC):
-    @abstractmethod
-    async def speech_to_text(self, audio_data: bytes) -> str:
-        """Convert speech to text."""
-        pass
-
-    @abstractmethod
-    async def text_to_speech(self, text: str) -> bytes:
-        """Convert text to speech."""
-        pass
-
-class SentimentAnalyzer(ABC):
-    @abstractmethod
-    async def analyze_sentiment(self, text: str) -> Dict[str, float]:
-        """Analyze sentiment from text."""
-        pass
-
-    @abstractmethod
-    async def analyze_facial_expression(self, image_data: bytes) -> Dict[str, float]:
-        """Analyze facial expressions from image."""
-        pass
-
-class ConversationManager(ABC):
-    @abstractmethod
-    async def generate_response(self, context: InterviewContext, user_input: str) -> str:
-        """Generate AI response based on context and user input."""
-        pass
-
-    @abstractmethod
-    async def evaluate_response(self, context: InterviewContext, user_response: str) -> Dict[str, Any]:
-        """Evaluate user's response."""
-        pass
-
-class InterviewSummarizer(ABC):
-    @abstractmethod
-    async def summarize_interview(self, context: InterviewContext) -> str:
-        """Summarize the interview."""
-        pass
-
-class DefaultInterviewSummarizer(InterviewSummarizer):
-    """
-    This class is responsible for summarizing the interview.
-    It includes the following methods:
-    - summarize_interview: Summarize the interview.
-    - _analyze_sentiment_trends: Analyze sentiment trends throughout the interview.
-    - _generate_assessment: Generate an overall assessment of the interview performance.
-    - _identify_strengths: Identify key strengths demonstrated during the interview.
-    - _identify_improvements: Identify areas that need improvement.
-    """
-    async def summarize_interview(self, context: InterviewContext) -> Dict[str, Any]:
-        """Generate a comprehensive summary of the interview."""
-        # Calculate time metrics
-        duration = (datetime.now() - context.start_time).total_seconds()
-        minutes = int(duration // 60)
-        seconds = int(duration % 60)
-        
-        # Analyze sentiment trends
-        sentiment_trends = self._analyze_sentiment_trends(context)
-        
-        # Generate overall assessment
-        assessment = self._generate_assessment(context)
-        
-        return {
-            "duration": f"{minutes}m {seconds}s",
-            "questions_answered": context.current_question_index,
-            "sentiment_trends": sentiment_trends,
-            "assessment": assessment,
-            "strengths": self._identify_strengths(context),
-            "areas_for_improvement": self._identify_improvements(context),
-            "recommendations": self._generate_recommendations(context)
-        }
-    
-    def _analyze_sentiment_trends(self, context: InterviewContext) -> Dict[str, Any]:
-        """Analyze sentiment trends throughout the interview."""
-        if not context.implicit_thoughts:
-            return {"message": "No sentiment data available"}
-            
-        # Extract sentiment scores from implicit thoughts
-        sentiments = []
-        for thought in context.implicit_thoughts:
-            if "tone appears" in thought:
-                sentiment = thought.split("tone appears")[1].split("(")[0].strip()
-                confidence = float(thought.split("(")[1].split(")")[0])
-                sentiments.append((sentiment, confidence))
-        
-        if not sentiments:
-            return {"message": "No sentiment data available"}
-            
-        # Calculate dominant sentiments
-        sentiment_counts = {}
-        for sentiment, confidence in sentiments:
-            if confidence > 0.5:  # Only count high confidence predictions
-                sentiment_counts[sentiment] = sentiment_counts.get(sentiment, 0) + 1
-        
-        return {
-            "dominant_sentiment": max(sentiment_counts.items(), key=lambda x: x[1])[0] if sentiment_counts else "neutral",
-            "sentiment_distribution": sentiment_counts,
-            "total_analyzed": len(sentiments)
-        }
-    
-    def _generate_assessment(self, context: InterviewContext) -> str:
-        """Generate an overall assessment of the interview performance."""
-        if not context.checklist:
-            return "No assessment criteria provided"
-            
-        completed_items = sum(1 for item in context.checklist if item.is_completed)
-        total_items = len(context.checklist)
-        completion_rate = (completed_items / total_items) * 100 if total_items > 0 else 0
-        
-        if completion_rate >= 80:
-            return "Excellent performance - demonstrated strong understanding of key concepts"
-        elif completion_rate >= 60:
-            return "Good performance - showed solid understanding with some areas for improvement"
-        elif completion_rate >= 40:
-            return "Satisfactory performance - basic understanding demonstrated"
-        else:
-            return "Needs improvement - key concepts require more attention"
-    
-    def _identify_strengths(self, context: InterviewContext) -> List[str]:
-        """Identify key strengths demonstrated during the interview."""
-        strengths = []
-        
-        # Analyze completed checklist items
-        if context.checklist:
-            completed_items = [item for item in context.checklist if item.is_completed]
-            if completed_items:
-                strengths.append(f"Successfully addressed {len(completed_items)} key assessment criteria")
-        
-        # Analyze sentiment trends
-        if context.implicit_thoughts:
-            positive_sentiments = sum(1 for thought in context.implicit_thoughts 
-                                   if "positive" in thought.lower() or "happy" in thought.lower())
-            if positive_sentiments > len(context.implicit_thoughts) / 2:
-                strengths.append("Maintained positive and engaging communication style")
-        
-        return strengths
-    
-    def _identify_improvements(self, context: InterviewContext) -> List[str]:
-        """Identify areas that need improvement."""
-        improvements = []
-        
-        # Analyze incomplete checklist items
-        if context.checklist:
-            incomplete_items = [item for item in context.checklist if not item.is_completed]
-            if incomplete_items:
-                improvements.append(f"Need to address {len(incomplete_items)} remaining assessment criteria")
-        
-        # Analyze sentiment trends
-        if context.implicit_thoughts:
-            negative_sentiments = sum(1 for thought in context.implicit_thoughts 
-                                   if "negative" in thought.lower() or "sad" in thought.lower())
-            if negative_sentiments > len(context.implicit_thoughts) / 3:
-                improvements.append("Work on maintaining more positive communication tone")
-        
-        return improvements
-    
-    def _generate_recommendations(self, context: InterviewContext) -> List[str]:
-        """Generate specific recommendations for improvement."""
-        recommendations = []
-        
-        # Add recommendations based on incomplete checklist items
-        if context.checklist:
-            incomplete_items = [item for item in context.checklist if not item.is_completed]
-            for item in incomplete_items:
-                recommendations.append(f"Focus on developing skills related to: {item.description}")
-        
-        # Add general recommendations based on interview performance
-        if context.current_question_index < 5:
-            recommendations.append("Practice more interview scenarios to build confidence")
-        
-        return recommendations
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class InterviewInteractionService:
     """
@@ -224,11 +31,11 @@ class InterviewInteractionService:
     """
     def __init__(
         self,
-        speech_processor: SpeechProcessor,
-        sentiment_analyzer: SentimentAnalyzer,
-        conversation_manager: ConversationManager,
-        interview_summarizer: InterviewSummarizer,
-        structure_service: Any  # Type hint for structure service
+        speech_processor: GoogleCloudSpeechProcessor,
+        sentiment_analyzer: MultiModalSentimentAnalyzer,
+        conversation_manager: InterviewConversationManager,
+        interview_summarizer: Optional[Any] = None,
+        structure_service: Optional[Any] = None
     ):
         self.speech_processor = speech_processor
         self.sentiment_analyzer = sentiment_analyzer
@@ -295,6 +102,78 @@ class InterviewInteractionService:
             context.implicit_thoughts.append(
                 f"Transitioning to {transition_data['to_phase']} phase"
             )
+
+    async def process_interview_step(
+        self,
+        interview_id: str,
+        audio_data: bytes,
+        video_data: Optional[bytes] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Process a single step of the interview interaction.
+        
+        Args:
+            interview_id: Unique identifier for the interview
+            audio_data: Raw audio data from the user
+            video_data: Optional video data from the user
+            metadata: Additional metadata about the interaction
+            
+        Returns:
+            Dict containing the processed results
+        """
+        # Process speech
+        transcription = await self.speech_processor.process_audio(audio_data)
+        
+        # Analyze sentiment
+        sentiment = await self.sentiment_analyzer.analyze(
+            text=transcription,
+            video_data=video_data
+        )
+        
+        # Update conversation state
+        conversation_state = await self.conversation_manager.update_state(
+            interview_id=interview_id,
+            user_input=transcription,
+            sentiment=sentiment
+        )
+        
+        # Get next question or response
+        response = await self.conversation_manager.get_response(
+            interview_id=interview_id,
+            current_state=conversation_state
+        )
+        
+        return {
+            "transcription": transcription,
+            "sentiment": sentiment,
+            "response": response,
+            "conversation_state": conversation_state
+        }
+
+    async def get_interview_status(self, interview_id: str) -> Dict[str, Any]:
+        """
+        Get the current status of an interview.
+        
+        Args:
+            interview_id: Unique identifier for the interview
+            
+        Returns:
+            Dict containing the interview status
+        """
+        return await self.conversation_manager.get_interview_status(interview_id)
+
+    async def reset_interview(self, interview_id: str) -> Dict[str, Any]:
+        """
+        Reset an interview to its initial state.
+        
+        Args:
+            interview_id: Unique identifier for the interview
+            
+        Returns:
+            Dict containing the reset confirmation
+        """
+        return await self.conversation_manager.reset_interview(interview_id)
 
     async def process_user_input(
         self,
@@ -466,3 +345,93 @@ class InterviewInteractionService:
         
         del self.active_interviews[interview_id]
         return summary 
+
+app = FastAPI(title="Interview Interaction Service")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize components
+sentiment_analyzer = MultiModalSentimentAnalyzer()
+summarizer = InterviewSummarizer()
+
+# Store active sessions
+active_sessions: Dict[str, InterviewContext] = {}
+
+@app.websocket("/ws/interview/{session_id}")
+async def interview_websocket(websocket: WebSocket, session_id: str):
+    """WebSocket endpoint for interview interactions."""
+    await websocket.accept()
+    
+    try:
+        # Initialize or retrieve session context
+        if session_id not in active_sessions:
+            # In a real app, you'd get this from a database
+            active_sessions[session_id] = InterviewContext(
+                session_id=session_id,
+                user_id="test_user"  # This should come from authentication
+            )
+        
+        context = active_sessions[session_id]
+        
+        while True:
+            # Receive message
+            data = await websocket.receive_text()
+            message = json.loads(data)
+            
+            if message["type"] == "answer":
+                # Process answer
+                answer = message["content"]
+                context.answer_history.append(answer)
+                
+                # Analyze sentiment
+                sentiment = sentiment_analyzer.analyze(answer)
+                context.sentiment_history.append(sentiment)
+                context.current_sentiment = sentiment
+                
+                # Send response
+                await websocket.send_json({
+                    "type": "sentiment",
+                    "sentiment": sentiment
+                })
+                
+            elif message["type"] == "question":
+                # Store question
+                question = message["content"]
+                context.current_question = question
+                context.question_history.append(question)
+                
+            elif message["type"] == "end_interview":
+                # Generate summary
+                summary = summarizer.summarize(context)
+                key_points = summarizer.get_key_points(context)
+                
+                # Send summary
+                await websocket.send_json({
+                    "type": "summary",
+                    "summary": summary,
+                    "key_points": key_points
+                })
+                
+                # Clean up
+                del active_sessions[session_id]
+                break
+                
+    except WebSocketDisconnect:
+        logger.info(f"Client disconnected from session {session_id}")
+        if session_id in active_sessions:
+            del active_sessions[session_id]
+    except Exception as e:
+        logger.error(f"Error in session {session_id}: {str(e)}")
+        await websocket.close(code=1011)  # Internal error
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()} 
