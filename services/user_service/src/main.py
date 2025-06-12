@@ -3,6 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 DB_SERVICE_URL = os.getenv("DB_SERVICE_URL", "http://localhost:8003")
 
@@ -36,15 +41,18 @@ async def health_check():
 
 @app.post("/auth/login")
 async def login(request: LoginRequest):
+    logger.info(f"Login attempt for email: {request.email}")
     async with httpx.AsyncClient() as client:
         try:
             # Verify credentials with DB service
+            logger.info("Sending verification request to DB service")
             response = await client.post(
                 f"{DB_SERVICE_URL}/users/verify",
                 json={"email": request.email, "password": request.password}
             )
             response.raise_for_status()
             user_data = response.json()
+            logger.info(f"Login successful for user: {request.email}")
             
             # In a real application, you would generate a proper JWT token
             return {
@@ -53,6 +61,7 @@ async def login(request: LoginRequest):
                 "user_id": user_data["user_id"]
             }
         except httpx.HTTPStatusError as e:
+            logger.error(f"Login failed for {request.email}: {str(e)}")
             if e.response.status_code == 401:
                 raise HTTPException(status_code=401, detail="Invalid credentials")
             raise HTTPException(status_code=500, detail="Database service error")

@@ -5,29 +5,8 @@ start_service() {
     osascript -e "tell application \"Terminal\" to do script \"cd $(pwd) && $1\""
 }
 
-# Function to install Python service dependencies
-install_python_service() {
-    local service=$1
-    echo "Installing dependencies for $service..."
-    cd $service
-    pip install -r requirements.txt
-    cd ../..
-}
-
-# Install frontend dependencies
-echo "Installing frontend dependencies..."
-cd frontend
-npm install
-cd ..
-
-# Activate virtual environment and install backend dependencies
-echo "Installing backend dependencies..."
+# Activate virtual environment
 source proto-env/bin/activate
-
-# Install dependencies for each service
-for service in services/*_service; do
-    install_python_service $service
-done
 
 # Start frontend
 echo "Starting frontend..."
@@ -48,6 +27,7 @@ start_service "cd services/db_service && source ../../proto-env/bin/activate && 
 # Interaction Service (Port 8004)
 start_service "cd services/interaction_service && source ../../proto-env/bin/activate && PYTHONPATH=$PYTHONPATH:$(pwd) uvicorn src.main:app --host 0.0.0.0 --port 8004 --reload"
 
+# IPs and Ports
 echo "All services are starting up..."
 echo "Frontend will be available at http://localhost:5173"
 echo "API docs will be available at:"

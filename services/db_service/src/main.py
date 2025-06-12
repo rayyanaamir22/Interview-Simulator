@@ -3,16 +3,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, String, JSON
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, scoped_session
 import os
 from typing import List, Optional
 import uuid
 from passlib.context import CryptContext
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Database setup
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./users.db")
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False}  # Allow multi-threaded access
+)
+SessionLocal = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 Base = declarative_base()
 
 # Password hashing
@@ -114,9 +122,20 @@ async def get_user(user_id: str, db: Session = Depends(get_db)):
 
 @app.post("/users/verify")
 async def verify_user_credentials(login: UserLogin, db: Session = Depends(get_db)):
+    logger.info(f"Attempting to verify credentials for email: {login.email}")
     user = db.query(UserModel).filter(UserModel.email == login.email).first()
-    if not user or not verify_password(login.password, user.hashed_password):
+    if not user:
+        logger.warning(f"No user found with email: {login.email}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    password_valid = verify_password(login.password, user.hashed_password)
+    logger.info(f"Password verification result: {password_valid}")
+    
+    if not password_valid:
+        logger.warning(f"Invalid password for user: {login.email}")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    logger.info(f"Successfully verified credentials for user: {login.email}")
     return {"user_id": user.id}
 
 @app.put("/users/{user_id}/preferences")
