@@ -30,6 +30,11 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    username: str
+
 class UserCreate(BaseModel):
     username: str
     email: str
@@ -38,6 +43,31 @@ class UserCreate(BaseModel):
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+@app.post("/auth/register")
+async def register(request: RegisterRequest):
+    logger.info(f"Registration attempt for email: {request.email}")
+    async with httpx.AsyncClient() as client:
+        try:
+            # Create user in DB service
+            logger.info("Sending registration request to DB service")
+            response = await client.post(
+                f"{DB_SERVICE_URL}/users/",
+                json={
+                    "email": request.email,
+                    "password": request.password,
+                    "username": request.username
+                }
+            )
+            response.raise_for_status()
+            user_data = response.json()
+            logger.info(f"Registration successful for user: {request.email}")
+            return {"message": "Registration successful", "user_id": user_data["id"]}
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Registration failed for {request.email}: {str(e)}")
+            if e.response.status_code == 400:
+                raise HTTPException(status_code=400, detail="Email or username already exists")
+            raise HTTPException(status_code=500, detail="Database service error")
 
 @app.post("/auth/login")
 async def login(request: LoginRequest):
