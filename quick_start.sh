@@ -10,7 +10,7 @@ install_python_service() {
     local service=$1
     echo "Installing dependencies for $service..."
     cd $service
-    pip install -e .
+    pip install -r requirements.txt
     cd ../..
 }
 
@@ -37,16 +37,16 @@ start_service "cd frontend && npm run dev"
 echo "Starting backend services..."
 
 # Structure Service (Port 8001)
-start_service "cd services/structure_service && source ../../proto-env/bin/activate && PYTHONPATH=$PYTHONPATH:$(pwd) uvicorn src.main:app --host 0.0.0.0 --port 8001"
+start_service "cd services/structure_service && source ../../proto-env/bin/activate && PYTHONPATH=$PYTHONPATH:$(pwd) uvicorn src.main:app --host 0.0.0.0 --port 8001 --reload"
 
 # User Service (Port 8002)
-start_service "cd services/user_service && source ../../proto-env/bin/activate && PYTHONPATH=$PYTHONPATH:$(pwd) uvicorn src.main:app --host 0.0.0.0 --port 8002"
+start_service "cd services/user_service && source ../../proto-env/bin/activate && PYTHONPATH=$PYTHONPATH:$(pwd) uvicorn src.main:app --host 0.0.0.0 --port 8002 --reload"
 
 # DB Service (Port 8003)
-start_service "cd services/db_service && source ../../proto-env/bin/activate && PYTHONPATH=$PYTHONPATH:$(pwd) uvicorn src.main:app --host 0.0.0.0 --port 8003"
+start_service "cd services/db_service && source ../../proto-env/bin/activate && PYTHONPATH=$PYTHONPATH:$(pwd) uvicorn src.main:app --host 0.0.0.0 --port 8003 --reload"
 
 # Interaction Service (Port 8004)
-start_service "cd services/interaction_service && source ../../proto-env/bin/activate && PYTHONPATH=$PYTHONPATH:$(pwd) uvicorn src.main:app --host 0.0.0.0 --port 8004"
+start_service "cd services/interaction_service && source ../../proto-env/bin/activate && PYTHONPATH=$PYTHONPATH:$(pwd) uvicorn src.main:app --host 0.0.0.0 --port 8004 --reload"
 
 echo "All services are starting up..."
 echo "Frontend will be available at http://localhost:5173"
