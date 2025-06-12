@@ -1,138 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import TimelineVisualization from './TimelineVisualization';
+import TimelineProgress from './TimelineProgress';
 import AddPhaseModal from './AddPhaseModal';
-
-const TimelineVisualization = ({ phases, onPhasesChange, onAddPhase, onDeletePhase, onEditPhase }) => {
-  const [hoveredPhaseIndex, setHoveredPhaseIndex] = useState(null);
-  const [hoveredGapIndex, setHoveredGapIndex] = useState(null);
-  
-  const handleDragEnd = (result) => {
-    if (!result.destination) return;
-    
-    const items = Array.from(phases);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-    
-    onPhasesChange(items);
-  };
-
-  return (
-    <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-      <h3 className="text-xl font-semibold mb-4">Interview Timeline</h3>
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable direction="vertical">
-          {(provided) => (
-            <div
-              {...provided.droppableProps}
-              ref={provided.innerRef}
-              className="relative min-h-[400px] w-64"
-            >
-              {/* Top gap for adding phase */}
-              <div
-                className="absolute w-64 h-2 -left-4"
-                style={{ top: '0' }}
-                onMouseEnter={() => setHoveredGapIndex(-1)}
-                onMouseLeave={() => setHoveredGapIndex(null)}
-              >
-                {hoveredGapIndex === -1 && (
-                  <button
-                    className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-indigo-600 focus:outline-none"
-                    onClick={() => onAddPhase(0)}
-                  >
-                    +
-                  </button>
-                )}
-              </div>
-
-              {phases.map((phase, index) => (
-                <Draggable key={phase.name} draggableId={phase.name} index={index}>
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      {...provided.dragHandleProps}
-                      className={`relative mb-2 group ${
-                        snapshot.isDragging ? 'opacity-50' : ''
-                      }`}
-                      onMouseEnter={() => setHoveredPhaseIndex(index)}
-                      onMouseLeave={() => setHoveredPhaseIndex(null)}
-                    >
-                      <div
-                        className="h-12 rounded flex items-center justify-center text-white font-medium transition-all duration-200 cursor-pointer"
-                        style={{
-                          backgroundColor: getPhaseColor(phase.name),
-                          transform: hoveredPhaseIndex === index ? 'translateX(8px)' : 'translateX(0)',
-                        }}
-                        onClick={() => onEditPhase(index)}
-                      >
-                        {phase.name} ({phase.duration}m)
-                      </div>
-                      
-                      {/* Delete button */}
-                      <button
-                        className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-8 
-                          bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center
-                          transition-all duration-200 opacity-0 group-hover:opacity-100
-                          hover:bg-red-600 focus:outline-none`}
-                        onClick={() => onDeletePhase(index)}
-                        style={{
-                          opacity: hoveredPhaseIndex === index ? 1 : 0,
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-              
-              {/* Gap hover areas between phases */}
-              {phases.map((_, index) => (
-                <div
-                  key={`gap-${index}`}
-                  className="absolute w-64 h-2 -left-4"
-                  style={{
-                    top: `${(index + 1) * 56}px`,
-                  }}
-                  onMouseEnter={() => setHoveredGapIndex(index)}
-                  onMouseLeave={() => setHoveredGapIndex(null)}
-                >
-                  {hoveredGapIndex === index && (
-                    <button
-                      className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-indigo-600 focus:outline-none"
-                      onClick={() => onAddPhase(index + 1)}
-                    >
-                      +
-                    </button>
-                  )}
-                </div>
-              ))}
-
-              {/* Bottom gap for adding phase */}
-              <div
-                className="absolute w-64 h-2 -left-4"
-                style={{ top: `${(phases.length + 1) * 56}px` }}
-                onMouseEnter={() => setHoveredGapIndex(phases.length)}
-                onMouseLeave={() => setHoveredGapIndex(null)}
-              >
-                {hoveredGapIndex === phases.length && (
-                  <button
-                    className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-indigo-600 focus:outline-none"
-                    onClick={() => onAddPhase(phases.length)}
-                  >
-                    +
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
-    </div>
-  );
-};
 
 const getPhaseColor = (phaseName) => {
   const colors = {
@@ -142,17 +12,18 @@ const getPhaseColor = (phaseName) => {
     'Coding': '#9C27B0',
     'Closing': '#F44336'
   };
+  
   return colors[phaseName] || '#607D8B';
 };
 
 const Home = () => {
   const { logout } = useAuth();
   const [phases, setPhases] = useState([
-    { name: 'Introduction', duration: 5, isSkippable: false, isShortenable: true },
-    { name: 'Behavioral', duration: 15, isSkippable: false, isShortenable: true },
-    { name: 'Technical', duration: 20, isSkippable: false, isShortenable: true },
-    { name: 'Coding', duration: 30, isSkippable: false, isShortenable: true },
-    { name: 'Closing', duration: 5, isSkippable: false, isShortenable: true }
+    { name: 'Introduction', duration: 5, isSkippable: false, isShortenable: true, color: getPhaseColor('Introduction') },
+    { name: 'Behavioral', duration: 15, isSkippable: false, isShortenable: true, color: getPhaseColor('Behavioral') },
+    { name: 'Technical', duration: 20, isSkippable: false, isShortenable: true, color: getPhaseColor('Technical') },
+    { name: 'Coding', duration: 30, isSkippable: false, isShortenable: true, color: getPhaseColor('Coding') },
+    { name: 'Closing', duration: 5, isSkippable: false, isShortenable: true, color: getPhaseColor('Closing') }
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -178,15 +49,20 @@ const Home = () => {
   };
 
   const handleNewPhase = (newPhase) => {
+    const phaseWithColor = {
+      ...newPhase,
+      color: newPhase.color || getPhaseColor(newPhase.name)
+    };
+    
     if (editingPhaseIndex !== null) {
       // Editing existing phase
       const newPhases = [...phases];
-      newPhases[editingPhaseIndex] = newPhase;
+      newPhases[editingPhaseIndex] = phaseWithColor;
       setPhases(newPhases);
     } else {
       // Adding new phase
       const newPhases = [...phases];
-      newPhases.splice(newPhaseIndex, 0, newPhase);
+      newPhases.splice(newPhaseIndex, 0, phaseWithColor);
       setPhases(newPhases);
     }
   };
@@ -256,6 +132,8 @@ const Home = () => {
           </div>
         </div>
       </nav>
+
+      <TimelineProgress phases={phases} />
 
       <main className="w-full py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
