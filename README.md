@@ -8,11 +8,13 @@ The easiest way to start all services is using the provided script:
 # Define a venv for Python requirements
 python3 -m venv proto-env
 
-# Make the script executable (only needed once)
+# Make the scripts executable (only needed once, unless modified)
+chmod +x install_dependencies.sh
 chmod +x quick_start.sh
 
 # Start all services
-./quick_start.sh
+./install_dependencies.sh  # only needed once, unless modified
+./quick_start.sh  # can run this any time, assuming correct dependencies are installed
 ```
 
 This will:

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000'; // User service URL
+const API_URL = 'http://localhost:8002'; // User service URL
 
 const authService = {
   async login(email, password) {
@@ -18,12 +18,12 @@ const authService = {
     }
   },
 
-  async register(email, password, name) {
+  async register(email, password, username) {
     try {
       const response = await axios.post(`${API_URL}/auth/register`, {
         email,
         password,
-        name,
+        username,
       });
       return response.data;
     } catch (error) {
