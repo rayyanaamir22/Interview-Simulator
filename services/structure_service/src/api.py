@@ -1,10 +1,21 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 from .structure_service import InterviewStructureService, InterviewPhase
 from datetime import datetime
 
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 structure_service = InterviewStructureService()
 
 class PhaseConfigRequest(BaseModel):
@@ -75,5 +86,21 @@ async def get_interview_status(interview_id: str):
             "current_phase": current_phase.phase.value,
             "progress": progress
         }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/interview/{interview_id}/pause")
+async def pause_interview(interview_id: str):
+    try:
+        await structure_service.pause_interview(interview_id)
+        return {"message": "Interview paused successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/interview/{interview_id}/resume")
+async def resume_interview(interview_id: str):
+    try:
+        await structure_service.resume_interview(interview_id)
+        return {"message": "Interview resumed successfully"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) 
