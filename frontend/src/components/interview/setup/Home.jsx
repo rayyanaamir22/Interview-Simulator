@@ -84,7 +84,7 @@ const Home = () => {
       console.log('Starting interview with phases:', phases);
       const requestBody = {
         phases: phases.map(phase => ({
-          phase: phase.name.toLowerCase(),
+          phase: phase.name,
           duration_minutes: phase.duration,
           is_skippable: phase.isSkippable,
           is_shortenable: phase.isShortenable
@@ -148,6 +148,16 @@ const Home = () => {
 
       // Store interview ID in localStorage for the interview page to use
       localStorage.setItem('currentInterviewId', data.interview_id);
+      // Store the complete phase configuration including colors
+      localStorage.setItem('interviewConfig', JSON.stringify({
+        phases: phases.map(phase => ({
+          phase: phase.name,
+          duration_minutes: phase.duration,
+          is_skippable: phase.isSkippable,
+          is_shortenable: phase.isShortenable,
+          color: phase.color
+        }))
+      }));
       // Navigate to interview page
       navigate('/interview');
     } catch (error) {
