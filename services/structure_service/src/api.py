@@ -61,7 +61,7 @@ async def start_interview(config: InterviewConfigRequest):
             "schedule": {
                 "phases": [
                     {
-                        "phase": phase.phase.value,
+                        "phase": phase.phase,
                         "duration_minutes": phase.duration_minutes,
                         "description": phase.description
                     }
@@ -83,7 +83,7 @@ async def get_interview_status(interview_id: str):
             
         progress = await structure_service.get_phase_progress(interview_id)
         return {
-            "current_phase": current_phase.phase.value,
+            "current_phase": current_phase.phase,
             "progress": progress
         }
     except Exception as e:

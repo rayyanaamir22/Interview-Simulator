@@ -14,16 +14,22 @@ from typing import Dict, List, Optional, Any
 import asyncio
 import json
 
-class InterviewPhase(Enum):
+class InterviewPhase(str, Enum):
+    """A string-based enum that allows custom values."""
     INTRODUCTION = "introduction"
     BEHAVIORAL = "behavioral"
     TECHNICAL = "technical"
     CODING = "coding"
     CLOSING = "closing"
 
+    @classmethod
+    def _missing_(cls, value):
+        """Allow any string value to be used as a phase."""
+        return value
+
 @dataclass
 class PhaseConfig:
-    phase: InterviewPhase
+    phase: str  # Changed from InterviewPhase to str to allow custom phases
     duration_minutes: int
     description: str
     is_skippable: bool = False
@@ -38,7 +44,7 @@ class InterviewSchedule:
 
 @dataclass
 class PhaseState:
-    phase: InterviewPhase
+    phase: str  # Changed from InterviewPhase to str to allow custom phases
     start_time: datetime
     end_time: datetime
     is_completed: bool = False
@@ -86,9 +92,9 @@ class InterviewStructureService:
         total_duration = 0
 
         for phase_data in custom_phases:
-            phase = InterviewPhase(phase_data["phase"])
+            phase = phase_data["phase"].lower()  # Accept any phase name
             duration = phase_data["duration_minutes"]
-            description = phase_data.get("description", f"{phase.value.title()} phase")
+            description = phase_data.get("description", f"{phase.title()} phase")
             
             phases.append(PhaseConfig(
                 phase=phase,
@@ -166,7 +172,7 @@ class InterviewStructureService:
         progress_percentage = (elapsed.total_seconds() / total.total_seconds()) * 100
 
         return {
-            "phase": current_phase.phase.value,
+            "phase": current_phase.phase,
             "elapsed_minutes": elapsed.total_seconds() / 60,
             "total_minutes": total.total_seconds() / 60,
             "progress_percentage": progress_percentage,
@@ -200,15 +206,15 @@ class InterviewStructureService:
             
             # Notify about phase transition
             await self.phase_transition_callbacks[interview_id]({
-                "from_phase": current_phase.phase.value,
-                "to_phase": next_phase.phase.value,
+                "from_phase": current_phase.phase,
+                "to_phase": next_phase.phase,
                 "was_forced": force_transition,
                 "time_impact": self._calculate_time_impact(current_phase)
             })
 
             return {
                 "success": True,
-                "message": f"Transitioned from {current_phase.phase.value} to {next_phase.phase.value}",
+                "message": f"Transitioned from {current_phase.phase} to {next_phase.phase}",
                 "time_impact": self._calculate_time_impact(current_phase)
             }
         else:
@@ -254,58 +260,46 @@ class InterviewStructureService:
         total = current_phase.end_time - current_phase.start_time
         remaining = total - elapsed
 
-        warnings = []
-        if remaining.total_seconds() < 0:
-            warnings.append({
-                "level": "critical",
-                "message": f"Phase is {abs(remaining.total_seconds() / 60):.1f} minutes over time"
-            })
-        elif remaining.total_seconds() < 60:  # Less than 1 minute remaining
-            warnings.append({
-                "level": "warning",
-                "message": "Less than 1 minute remaining in current phase"
-            })
-        elif remaining.total_seconds() < 300:  # Less than 5 minutes remaining
-            warnings.append({
-                "level": "info",
-                "message": f"{remaining.total_seconds() / 60:.1f} minutes remaining in current phase"
-            })
-
-        return {
-            "phase": current_phase.phase.value,
+        warnings = {
+            "phase": current_phase.phase,
             "elapsed_minutes": elapsed.total_seconds() / 60,
             "remaining_minutes": remaining.total_seconds() / 60,
-            "warnings": warnings
+            "total_minutes": total.total_seconds() / 60,
+            "is_running_late": elapsed > total,
+            "is_almost_done": remaining.total_seconds() < 300  # 5 minutes
         }
 
+        return warnings
+
     async def _monitor_phases(self, interview_id: str) -> None:
-        """Monitor phases and handle automatic transitions if needed."""
-        while interview_id in self.active_interviews:
-            interview_data = self.active_interviews[interview_id]
-            if not interview_data["is_paused"]:
+        """Monitor phases and handle transitions."""
+        while True:
+            try:
                 current_phase = await self.get_current_phase(interview_id)
-                if current_phase and not current_phase.is_completed:
-                    now = datetime.now()
-                    if now >= current_phase.end_time:
-                        # Phase time exceeded, notify for potential transition
-                        await self.phase_transition_callbacks[interview_id]({
-                            "phase": current_phase.phase.value,
-                            "status": "time_exceeded",
-                            "time_impact": self._calculate_time_impact(current_phase)
-                        })
-            await asyncio.sleep(1)  # Check every second
+                if not current_phase:
+                    break
+
+                now = datetime.now()
+                if self.active_interviews[interview_id]["is_paused"]:
+                    now = self.active_interviews[interview_id]["pause_start_time"]
+
+                if now >= current_phase.end_time:
+                    await self.handle_phase_transition(interview_id)
+
+                await asyncio.sleep(1)
+            except Exception as e:
+                print(f"Error monitoring phases for interview {interview_id}: {e}")
+                break
 
     def _calculate_time_impact(self, phase: PhaseState) -> Dict[str, Any]:
         """Calculate the time impact of a phase."""
-        if not phase.actual_duration_minutes:
-            return {"message": "Phase not completed"}
-
-        expected_duration = (phase.end_time - phase.start_time).total_seconds() / 60
-        time_difference = phase.actual_duration_minutes - expected_duration
+        actual_duration = phase.actual_duration_minutes or 0
+        planned_duration = (phase.end_time - phase.start_time).total_seconds() / 60
+        time_difference = actual_duration - planned_duration
 
         return {
-            "expected_minutes": expected_duration,
-            "actual_minutes": phase.actual_duration_minutes,
-            "difference_minutes": time_difference,
+            "actual_duration_minutes": actual_duration,
+            "planned_duration_minutes": planned_duration,
+            "time_difference_minutes": time_difference,
             "is_over_time": time_difference > 0
         } 
