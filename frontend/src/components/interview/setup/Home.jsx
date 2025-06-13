@@ -32,6 +32,7 @@ const Home = () => {
   const [showAddPhaseModal, setShowAddPhaseModal] = useState(false);
   const [newPhaseIndex, setNewPhaseIndex] = useState(null);
   const [editingPhaseIndex, setEditingPhaseIndex] = useState(null);
+  const navigate = useNavigate();
 
   const handlePhasesChange = (newPhases) => {
     setPhases(newPhases);
@@ -80,32 +81,85 @@ const Home = () => {
     setSuccess(null);
 
     try {
-      const response = await fetch('/api/interview/start', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          phases: phases.map(phase => ({
-            phase: phase.name.toLowerCase(),
-            duration_minutes: phase.duration,
-            is_skippable: phase.isSkippable,
-            is_shortenable: phase.isShortenable
-          }))
-        })
-      });
+      console.log('Starting interview with phases:', phases);
+      const requestBody = {
+        phases: phases.map(phase => ({
+          phase: phase.name,
+          duration_minutes: phase.duration,
+          is_skippable: phase.isSkippable,
+          is_shortenable: phase.isShortenable
+        }))
+      };
+      console.log('Request body:', JSON.stringify(requestBody, null, 2));
+
+      // Try both URLs to debug the issue
+      const urls = [
+        'http://localhost:8001/api/interview/start',
+        '/api/interview/start'
+      ];
+
+      let response;
+      let lastError;
+
+      for (const url of urls) {
+        try {
+          console.log('Trying URL:', url);
+          response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+          });
+          console.log('Response status:', response.status);
+          console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+          break;
+        } catch (error) {
+          console.error(`Failed with URL ${url}:`, error);
+          lastError = error;
+        }
+      }
+
+      if (!response) {
+        throw lastError || new Error('All URL attempts failed');
+      }
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorText = await response.text();
+        console.error('Error response text:', errorText);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { detail: errorText };
+        }
         throw new Error(errorData.detail || 'Failed to start interview');
       }
 
-      const data = await response.json();
-      setSuccess({
-        message: 'Interview configured successfully!',
-        interviewId: data.interview_id,
-        schedule: data.schedule
-      });
+      const responseText = await response.text();
+      console.log('Response text:', responseText);
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response as JSON:', e);
+        throw new Error('Invalid response from server');
+      }
+
+      // Store interview ID in localStorage for the interview page to use
+      localStorage.setItem('currentInterviewId', data.interview_id);
+      // Store the complete phase configuration including colors
+      localStorage.setItem('interviewConfig', JSON.stringify({
+        phases: phases.map(phase => ({
+          phase: phase.name,
+          duration_minutes: phase.duration,
+          is_skippable: phase.isSkippable,
+          is_shortenable: phase.isShortenable,
+          color: phase.color
+        }))
+      }));
+      // Navigate to interview page
+      navigate('/interview');
     } catch (error) {
       setError(error.message);
       console.error('Error starting interview:', error);

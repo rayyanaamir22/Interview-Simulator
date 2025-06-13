@@ -19,7 +19,7 @@ const TimelineProgress = ({ phases }) => {
             style={{
               left: `${left}%`,
               width: `${width}%`,
-              backgroundColor: phase.color,
+              backgroundColor: phase.color || '#607D8B',
             }}
           />
         );
