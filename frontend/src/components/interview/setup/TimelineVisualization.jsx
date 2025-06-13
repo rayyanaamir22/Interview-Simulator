@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 const TimelineVisualization = ({ phases, onPhasesChange, onAddPhase, onDeletePhase, onEditPhase }) => {
   const [hoveredPhaseIndex, setHoveredPhaseIndex] = useState(null);
   const [hoveredGapIndex, setHoveredGapIndex] = useState(null);
-  
+
   const handleDragEnd = (result) => {
     if (!result.destination) return;
     
@@ -24,7 +24,7 @@ const TimelineVisualization = ({ phases, onPhasesChange, onAddPhase, onDeletePha
             <div
               {...provided.droppableProps}
               ref={provided.innerRef}
-              className="relative min-h-[400px]"
+              className="relative min-h-[400px] select-none"
             >
               {/* Top gap for adding phase */}
               <div
@@ -34,7 +34,7 @@ const TimelineVisualization = ({ phases, onPhasesChange, onAddPhase, onDeletePha
               >
                 {hoveredGapIndex === -1 && (
                   <button
-                    className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-indigo-600 focus:outline-none"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-indigo-600 focus:outline-none select-none"
                     onClick={() => onAddPhase(0)}
                   >
                     +
@@ -43,12 +43,15 @@ const TimelineVisualization = ({ phases, onPhasesChange, onAddPhase, onDeletePha
               </div>
 
               {phases.map((phase, index) => (
-                <Draggable key={phase.name} draggableId={phase.name} index={index}>
+                <Draggable 
+                  key={phase.name} 
+                  draggableId={phase.name} 
+                  index={index}
+                >
                   {(provided, snapshot) => (
                     <div
                       ref={provided.innerRef}
                       {...provided.draggableProps}
-                      {...provided.dragHandleProps}
                       className={`relative mb-2 group ${
                         snapshot.isDragging ? 'opacity-50' : ''
                       }`}
@@ -56,14 +59,36 @@ const TimelineVisualization = ({ phases, onPhasesChange, onAddPhase, onDeletePha
                       onMouseLeave={() => setHoveredPhaseIndex(null)}
                     >
                       <div
-                        className="h-12 rounded flex items-center justify-center text-white font-medium transition-all duration-200 cursor-pointer"
+                        className="h-12 rounded flex items-center text-white font-medium transition-all duration-200"
                         style={{
                           backgroundColor: phase.color,
                           transform: hoveredPhaseIndex === index ? 'translateX(8px)' : 'translateX(0)',
+                          ...provided.draggableProps.style,
+                          position: snapshot.isDragging ? 'relative' : 'static',
+                          left: snapshot.isDragging ? '0' : 'auto',
+                          top: snapshot.isDragging ? '0' : 'auto',
+                          width: snapshot.isDragging ? '100%' : 'auto',
                         }}
-                        onClick={() => onEditPhase(index)}
                       >
-                        {phase.name} ({phase.duration}m)
+                        {/* Drag handle */}
+                        <div
+                          {...provided.dragHandleProps}
+                          className="h-full px-3 flex items-center cursor-grab active:cursor-grabbing select-none"
+                        >
+                          <div className="flex flex-col gap-1">
+                            <div className="w-4 h-0.5 bg-white/70"></div>
+                            <div className="w-4 h-0.5 bg-white/70"></div>
+                            <div className="w-4 h-0.5 bg-white/70"></div>
+                          </div>
+                        </div>
+                        
+                        {/* Phase name and duration */}
+                        <div 
+                          className="flex-1 text-center cursor-pointer select-none"
+                          onClick={() => onEditPhase(index)}
+                        >
+                          {phase.name} ({phase.duration}m)
+                        </div>
                       </div>
                       
                       {/* Delete button */}
@@ -71,7 +96,7 @@ const TimelineVisualization = ({ phases, onPhasesChange, onAddPhase, onDeletePha
                         className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-8 
                           bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center
                           transition-all duration-200 opacity-0 group-hover:opacity-100
-                          hover:bg-red-600 focus:outline-none`}
+                          hover:bg-red-600 focus:outline-none select-none`}
                         onClick={() => onDeletePhase(index)}
                         style={{
                           opacity: hoveredPhaseIndex === index ? 1 : 0,
@@ -88,7 +113,7 @@ const TimelineVisualization = ({ phases, onPhasesChange, onAddPhase, onDeletePha
                       >
                         {hoveredGapIndex === index && (
                           <button
-                            className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-indigo-600 focus:outline-none"
+                            className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-indigo-600 focus:outline-none select-none"
                             onClick={() => onAddPhase(index + 1)}
                           >
                             +
@@ -110,7 +135,7 @@ const TimelineVisualization = ({ phases, onPhasesChange, onAddPhase, onDeletePha
               >
                 {hoveredGapIndex === phases.length && (
                   <button
-                    className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-indigo-600 focus:outline-none"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-indigo-600 focus:outline-none select-none"
                     onClick={() => onAddPhase(phases.length)}
                   >
                     +
