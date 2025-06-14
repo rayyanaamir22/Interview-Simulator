@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Dropdown, Space, Progress } from 'antd';
-import { MoreOutlined, PauseOutlined, PlayCircleOutlined, CloseOutlined, VideoCameraOutlined, AudioOutlined } from '@ant-design/icons';
+import { Button, Dropdown } from 'antd';
+import { MoreOutlined, PauseOutlined, PlayCircleOutlined, CloseOutlined, VideoCameraOutlined, AudioOutlined, FileTextOutlined } from '@ant-design/icons';
 import axios from 'axios';
-import TimelineVisualization from '../setup/TimelineVisualization';
 import TimelineProgress from '../setup/TimelineProgress';
+import ClosedCaptions from './ClosedCaptions';
 
 interface Phase {
   name: string;
@@ -24,39 +24,31 @@ interface InterviewStatus {
   };
 }
 
-const getPhaseColor = (phaseName: string) => {
-  const colors: { [key: string]: string } = {
-    'Introduction': '#4CAF50',
-    'Behavioral': '#2196F3',
-    'Technical': '#FF9800',
-    'Coding': '#9C27B0',
-    'Closing': '#F44336'
-  };
-  
-  return colors[phaseName] || '#607D8B';
-};
-
 const InterviewPage: React.FC = () => {
   const navigate = useNavigate();
+  
+  // Interview state
   const [isPaused, setIsPaused] = useState(false);
   const [timer, setTimer] = useState(0);
   const [phases, setPhases] = useState<Phase[]>([]);
   const [currentPhase, setCurrentPhase] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(false);
-  const [isAudioEnabled, setIsAudioEnabled] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const timerRef = useRef<number | null>(null);
   const interviewIdRef = useRef<string>('');
+  const timerRef = useRef<number | null>(null);
   const lastPhaseRef = useRef<string | null>(null);
 
+  // Media state
+  const [isVideoEnabled, setIsVideoEnabled] = useState(false);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(false);
+  const [isCaptionsEnabled, setIsCaptionsEnabled] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<any>(null);
+
+  // Initialize interview
   useEffect(() => {
     document.title = 'Interview Simulator | Session';
-  }, []);
-
-  useEffect(() => {
-    // Get interview ID from localStorage
+    
     const interviewId = localStorage.getItem('currentInterviewId');
     if (!interviewId) {
       navigate('/');
@@ -64,72 +56,41 @@ const InterviewPage: React.FC = () => {
     }
     interviewIdRef.current = interviewId;
 
-    // Get the interview configuration from localStorage
     const config = JSON.parse(localStorage.getItem('interviewConfig') || '{}');
     if (config.phases) {
       setPhases(config.phases.map((phase: any) => ({
         name: phase.phase,
         duration: phase.duration_minutes,
-        color: phase.color || getPhaseColor(phase.phase)
+        color: phase.color || '#607D8B'
       })));
     }
 
-    // Start polling for interview status
-    const pollInterval = setInterval(async () => {
-      try {
-        const response = await axios.get(`http://localhost:8001/api/interview/${interviewId}/status`);
-        const status: InterviewStatus = response.data;
-        
-        // Update current phase and progress
-        if (status.current_phase !== lastPhaseRef.current) {
-          console.log('Phase transition:', {
-            from: lastPhaseRef.current || 'initial',
-            to: status.current_phase
-          });
-          lastPhaseRef.current = status.current_phase;
-          setCurrentPhase(status.current_phase);
-        }
-        setProgress(status.progress.progress_percentage);
-        
-        // Log status updates for debugging
-        console.log('Interview status:', {
-          currentPhase: status.current_phase,
-          progress: status.progress.progress_percentage,
-          isCompleted: status.progress.is_completed,
-          elapsedMinutes: status.progress.elapsed_minutes,
-          totalMinutes: status.progress.total_minutes
-        });
-        
-        if (status.progress.is_completed) {
-          clearInterval(pollInterval);
-          // Navigate to completion page
-          navigate('/interview/completion');
-        }
-      } catch (error) {
-        console.error('Failed to get interview status:', error);
-      }
-    }, 1000); // Poll every second
-
-    // Start the timer
     startTimer();
+    startStatusPolling();
 
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      clearInterval(pollInterval);
-      // Clean up media stream
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
+      cleanup();
     };
   }, [navigate]);
 
+  // Cleanup function
+  const cleanup = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+  };
+
+  // Timer functions
   const startTimer = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
     }
-    
     timerRef.current = window.setInterval(() => {
       if (!isPaused) {
         setTimer(prev => prev + 1);
@@ -137,6 +98,121 @@ const InterviewPage: React.FC = () => {
     }, 1000);
   };
 
+  // Status polling
+  const startStatusPolling = () => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await axios.get(`http://localhost:8001/api/interview/${interviewIdRef.current}/status`);
+        const status: InterviewStatus = response.data;
+        
+        if (status.current_phase !== lastPhaseRef.current) {
+          lastPhaseRef.current = status.current_phase;
+          setCurrentPhase(status.current_phase);
+        }
+        setProgress(status.progress.progress_percentage);
+        
+        if (status.progress.is_completed) {
+          clearInterval(pollInterval);
+          navigate('/interview/completion');
+        }
+      } catch (error) {
+        console.error('Failed to get interview status:', error);
+      }
+    }, 1000);
+
+    return () => clearInterval(pollInterval);
+  };
+
+  // Media control functions
+  const initializeMediaStream = async (constraints: MediaStreamConstraints) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      streamRef.current = stream;
+      return stream;
+    } catch (error) {
+      console.error('Error accessing media devices:', error);
+      return null;
+    }
+  };
+
+  const toggleVideo = async () => {
+    try {
+      if (!isVideoEnabled) {
+        const constraints = {
+          video: true,
+          audio: isAudioEnabled
+        };
+        const stream = await initializeMediaStream(constraints);
+        if (stream) {
+          setIsVideoEnabled(true);
+        }
+      } else {
+        if (streamRef.current) {
+          const videoTrack = streamRef.current.getVideoTracks()[0];
+          if (videoTrack) {
+            videoTrack.stop();
+          }
+          
+          if (isAudioEnabled) {
+            const audioStream = await initializeMediaStream({ audio: true });
+            if (!audioStream) {
+              setIsAudioEnabled(false);
+            }
+          } else {
+            if (videoRef.current) {
+              videoRef.current.srcObject = null;
+            }
+            streamRef.current = null;
+          }
+        }
+        setIsVideoEnabled(false);
+      }
+    } catch (error) {
+      console.error('Error toggling video:', error);
+    }
+  };
+
+  const toggleAudio = async () => {
+    try {
+      if (!isAudioEnabled) {
+        const constraints = {
+          video: isVideoEnabled,
+          audio: true
+        };
+        const stream = await initializeMediaStream(constraints);
+        if (stream) {
+          setIsAudioEnabled(true);
+        }
+      } else {
+        if (streamRef.current) {
+          const audioTrack = streamRef.current.getAudioTracks()[0];
+          if (audioTrack) {
+            audioTrack.stop();
+          }
+          
+          if (isVideoEnabled) {
+            const videoStream = await initializeMediaStream({ video: true });
+            if (!videoStream) {
+              setIsVideoEnabled(false);
+            }
+          } else {
+            if (videoRef.current) {
+              videoRef.current.srcObject = null;
+            }
+            streamRef.current = null;
+          }
+        }
+        setIsAudioEnabled(false);
+      }
+    } catch (error) {
+      console.error('Error toggling audio:', error);
+    }
+  };
+
+  // Interview control functions
   const handlePause = async () => {
     try {
       await axios.post(`http://localhost:8001/api/interview/${interviewIdRef.current}/pause`);
@@ -153,14 +229,7 @@ const InterviewPage: React.FC = () => {
     try {
       await axios.post(`http://localhost:8001/api/interview/${interviewIdRef.current}/resume`);
       setIsPaused(false);
-      // Clear any existing interval first
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      // Start a new interval
-      timerRef.current = window.setInterval(() => {
-        setTimer(prev => prev + 1);
-      }, 1000);
+      startTimer();
     } catch (error) {
       console.error('Failed to resume interview:', error);
     }
@@ -168,6 +237,7 @@ const InterviewPage: React.FC = () => {
 
   const handleExit = () => {
     if (window.confirm('Are you sure you want to exit the interview?')) {
+      cleanup();
       localStorage.removeItem('currentInterviewId');
       navigate('/');
     }
@@ -179,59 +249,7 @@ const InterviewPage: React.FC = () => {
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const toggleVideo = async () => {
-    if (!isVideoEnabled) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: isAudioEnabled });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          streamRef.current = stream;
-        }
-        setIsVideoEnabled(true);
-      } catch (error) {
-        console.error('Error accessing webcam:', error);
-      }
-    } else {
-      if (streamRef.current) {
-        const videoTrack = streamRef.current.getVideoTracks()[0];
-        if (videoTrack) {
-          videoTrack.stop();
-        }
-        if (videoRef.current) {
-          videoRef.current.srcObject = null;
-        }
-      }
-      setIsVideoEnabled(false);
-    }
-  };
-
-  const toggleAudio = async () => {
-    if (!isAudioEnabled) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: isVideoEnabled, 
-          audio: true 
-        });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          streamRef.current = stream;
-        }
-        setIsAudioEnabled(true);
-      } catch (error) {
-        console.error('Error accessing microphone:', error);
-      }
-    } else {
-      if (streamRef.current) {
-        const audioTrack = streamRef.current.getAudioTracks()[0];
-        if (audioTrack) {
-          audioTrack.stop();
-        }
-      }
-      setIsAudioEnabled(false);
-    }
-  };
-
-  const items = [
+  const dropdownItems = [
     {
       key: 'pause',
       icon: isPaused ? <PlayCircleOutlined /> : <PauseOutlined />,
@@ -257,7 +275,7 @@ const InterviewPage: React.FC = () => {
             </div>
             <div className="flex items-center">
               <Dropdown
-                menu={{ items }}
+                menu={{ items: dropdownItems }}
                 placement="bottomRight"
                 trigger={['click']}
               >
@@ -287,7 +305,7 @@ const InterviewPage: React.FC = () => {
           </div>
 
           {/* Webcam feed */}
-          <div className="w-full h-[calc(100vh-280px)] bg-gray-200 overflow-hidden relative">
+          <div className="w-full min-h-[500px] h-[calc(100vh-200px)] bg-gray-200 overflow-hidden relative">
             <video
               ref={videoRef}
               autoPlay
@@ -311,16 +329,28 @@ const InterviewPage: React.FC = () => {
             type="text"
             icon={<VideoCameraOutlined style={{ fontSize: '24px', color: isVideoEnabled ? '#1890ff' : '#8c8c8c' }} />}
             onClick={toggleVideo}
-            className="flex items-center justify-center w-12 h-12 rounded-full hover:bg-gray-100"
+            className="flex items-center justify-center w-14 h-14 rounded-full hover:bg-gray-100 border border-gray-200"
           />
           <Button
             type="text"
             icon={<AudioOutlined style={{ fontSize: '24px', color: isAudioEnabled ? '#1890ff' : '#8c8c8c' }} />}
             onClick={toggleAudio}
-            className="flex items-center justify-center w-12 h-12 rounded-full hover:bg-gray-100"
+            className="flex items-center justify-center w-14 h-14 rounded-full hover:bg-gray-100 border border-gray-200"
+          />
+          <Button
+            type="text"
+            icon={<FileTextOutlined style={{ fontSize: '24px', color: isCaptionsEnabled ? '#1890ff' : '#8c8c8c' }} />}
+            onClick={() => setIsCaptionsEnabled(!isCaptionsEnabled)}
+            className="flex items-center justify-center w-14 h-14 rounded-full hover:bg-gray-100 border border-gray-200"
           />
         </div>
       </div>
+
+      {/* Closed Captions */}
+      <ClosedCaptions 
+        isEnabled={isCaptionsEnabled && isAudioEnabled} 
+        audioStream={streamRef.current}
+      />
     </div>
   );
 };
