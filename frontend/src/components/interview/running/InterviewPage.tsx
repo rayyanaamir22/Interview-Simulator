@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Dropdown, Space, Progress } from 'antd';
-import { MoreOutlined, PauseOutlined, PlayCircleOutlined, CloseOutlined } from '@ant-design/icons';
+import { MoreOutlined, PauseOutlined, PlayCircleOutlined, CloseOutlined, VideoCameraOutlined, AudioOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import TimelineVisualization from '../setup/TimelineVisualization';
 import TimelineProgress from '../setup/TimelineProgress';
@@ -43,9 +43,17 @@ const InterviewPage: React.FC = () => {
   const [phases, setPhases] = useState<Phase[]>([]);
   const [currentPhase, setCurrentPhase] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(false);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<number | null>(null);
   const interviewIdRef = useRef<string>('');
   const lastPhaseRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    document.title = 'Interview Simulator | Session';
+  }, []);
 
   useEffect(() => {
     // Get interview ID from localStorage
@@ -94,8 +102,8 @@ const InterviewPage: React.FC = () => {
         
         if (status.progress.is_completed) {
           clearInterval(pollInterval);
-          // Handle interview completion
-          console.log('Interview completed');
+          // Navigate to completion page
+          navigate('/interview/completion');
         }
       } catch (error) {
         console.error('Failed to get interview status:', error);
@@ -110,6 +118,10 @@ const InterviewPage: React.FC = () => {
         clearInterval(timerRef.current);
       }
       clearInterval(pollInterval);
+      // Clean up media stream
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
     };
   }, [navigate]);
 
@@ -167,6 +179,58 @@ const InterviewPage: React.FC = () => {
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  const toggleVideo = async () => {
+    if (!isVideoEnabled) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: isAudioEnabled });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          streamRef.current = stream;
+        }
+        setIsVideoEnabled(true);
+      } catch (error) {
+        console.error('Error accessing webcam:', error);
+      }
+    } else {
+      if (streamRef.current) {
+        const videoTrack = streamRef.current.getVideoTracks()[0];
+        if (videoTrack) {
+          videoTrack.stop();
+        }
+        if (videoRef.current) {
+          videoRef.current.srcObject = null;
+        }
+      }
+      setIsVideoEnabled(false);
+    }
+  };
+
+  const toggleAudio = async () => {
+    if (!isAudioEnabled) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: isVideoEnabled, 
+          audio: true 
+        });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          streamRef.current = stream;
+        }
+        setIsAudioEnabled(true);
+      } catch (error) {
+        console.error('Error accessing microphone:', error);
+      }
+    } else {
+      if (streamRef.current) {
+        const audioTrack = streamRef.current.getAudioTracks()[0];
+        if (audioTrack) {
+          audioTrack.stop();
+        }
+      }
+      setIsAudioEnabled(false);
+    }
+  };
+
   const items = [
     {
       key: 'pause',
@@ -185,8 +249,8 @@ const InterviewPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation Bar */}
-      <nav className="bg-white shadow-sm">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
+      <nav className="bg-white shadow-sm w-full">
+        <div className="w-full px-4">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <h1 className="text-xl font-bold text-gray-900">Interview Simulator</h1>
@@ -210,10 +274,10 @@ const InterviewPage: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <main className="w-full py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
+      <main className="w-full mb-20">
+        <div className="w-full">
           {/* Current Phase and Timer */}
-          <div className="flex justify-between items-center mb-8">
+          <div className="flex justify-between items-center p-4">
             <div className="text-lg font-medium text-gray-700">
               Current Phase: {currentPhase || 'Initial'}
             </div>
@@ -223,15 +287,39 @@ const InterviewPage: React.FC = () => {
           </div>
 
           {/* Webcam feed */}
-          <div className="w-full h-[calc(100vh-400px)] bg-gray-200 rounded-lg flex items-center justify-center">
-            <span className="text-gray-500">Webcam Feed Coming Soon</span>
+          <div className="w-full h-[calc(100vh-280px)] bg-gray-200 overflow-hidden relative">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover scale-x-[-1]"
+            />
+            {!isVideoEnabled && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50">
+                <span className="text-white text-lg">Camera is off</span>
+              </div>
+            )}
           </div>
         </div>
       </main>
 
       {/* Bottom Bar */}
-      <div className="bg-white shadow-md p-4">
-        {/* This will be populated with dynamic content later */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white shadow-md p-4 h-20">
+        <div className="flex justify-center space-x-6 h-full items-center">
+          <Button
+            type="text"
+            icon={<VideoCameraOutlined style={{ fontSize: '24px', color: isVideoEnabled ? '#1890ff' : '#8c8c8c' }} />}
+            onClick={toggleVideo}
+            className="flex items-center justify-center w-12 h-12 rounded-full hover:bg-gray-100"
+          />
+          <Button
+            type="text"
+            icon={<AudioOutlined style={{ fontSize: '24px', color: isAudioEnabled ? '#1890ff' : '#8c8c8c' }} />}
+            onClick={toggleAudio}
+            className="flex items-center justify-center w-12 h-12 rounded-full hover:bg-gray-100"
+          />
+        </div>
       </div>
     </div>
   );

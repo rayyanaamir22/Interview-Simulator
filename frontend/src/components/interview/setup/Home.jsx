@@ -34,6 +34,10 @@ const Home = () => {
   const [editingPhaseIndex, setEditingPhaseIndex] = useState(null);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    document.title = 'Interview Simulator | Home';
+  }, []);
+
   const handlePhasesChange = (newPhases) => {
     setPhases(newPhases);
   };
@@ -170,8 +174,8 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
+      <nav className="bg-white shadow-sm w-full">
+        <div className="w-full px-4">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <h1 className="text-xl font-bold text-gray-900">Interview Simulator</h1>
@@ -190,9 +194,9 @@ const Home = () => {
 
       <TimelineProgress phases={phases} />
 
-      <main className="w-full py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="text-center mb-12">
+      <main className="w-full">
+        <div className="w-full">
+          <div className="text-center mb-12 pt-8">
             <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
               Configure Your Interview
             </h2>
@@ -202,20 +206,20 @@ const Home = () => {
           </div>
 
           {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3">
               {error}
             </div>
           )}
 
           {success && (
-            <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+            <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3">
               <p className="font-medium">{success.message}</p>
               <p className="text-sm mt-1">Interview ID: {success.interviewId}</p>
               <p className="text-sm mt-1">Total Duration: {success.schedule.total_duration_minutes} minutes</p>
             </div>
           )}
 
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-4xl mx-auto px-4">
             <TimelineVisualization 
               phases={phases}
               onPhasesChange={handlePhasesChange}
@@ -224,7 +228,7 @@ const Home = () => {
               onEditPhase={handleEditPhase}
             />
 
-            <div className="mt-8 text-center">
+            <div className="mt-8 text-center mb-8">
               <button
                 onClick={handleStartInterview}
                 disabled={isLoading}
@@ -239,16 +243,18 @@ const Home = () => {
         </div>
       </main>
 
-      <AddPhaseModal
-        isOpen={showAddPhaseModal}
-        onClose={() => {
-          setShowAddPhaseModal(false);
-          setEditingPhaseIndex(null);
-        }}
-        onAdd={handleNewPhase}
-        position={newPhaseIndex}
-        initialPhase={editingPhaseIndex !== null ? phases[editingPhaseIndex] : null}
-      />
+      {showAddPhaseModal && (
+        <AddPhaseModal
+          isOpen={showAddPhaseModal}
+          onClose={() => {
+            setShowAddPhaseModal(false);
+            setEditingPhaseIndex(null);
+          }}
+          onAdd={handleNewPhase}
+          position={newPhaseIndex}
+          initialPhase={editingPhaseIndex !== null ? phases[editingPhaseIndex] : null}
+        />
+      )}
     </div>
   );
 };

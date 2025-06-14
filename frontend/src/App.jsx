@@ -6,6 +6,7 @@ import Login from './components/auth/Login';
 import Signup from './components/auth/Signup';
 import Home from './components/interview/setup/Home';
 import InterviewPage from './components/interview/running/InterviewPage';
+import InterviewCompletionPage from './components/interview/completion/InterviewCompletionPage';
 import './App.css';
 
 function App() {
@@ -28,6 +29,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <InterviewPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/interview/completion"
+            element={
+              <ProtectedRoute>
+                <InterviewCompletionPage />
               </ProtectedRoute>
             }
           />
