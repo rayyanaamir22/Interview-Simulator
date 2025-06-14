@@ -78,9 +78,7 @@ const InterviewPage: React.FC = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
     }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
+    stopAllTracks();
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
@@ -124,8 +122,24 @@ const InterviewPage: React.FC = () => {
   };
 
   // Media control functions
+  const stopAllTracks = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  };
+
   const initializeMediaStream = async (constraints: MediaStreamConstraints) => {
     try {
+      // Stop any existing tracks before getting new ones
+      stopAllTracks();
+      
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -154,24 +168,25 @@ const InterviewPage: React.FC = () => {
           const videoTrack = streamRef.current.getVideoTracks()[0];
           if (videoTrack) {
             videoTrack.stop();
+            videoTrack.enabled = false;
           }
           
           if (isAudioEnabled) {
             const audioStream = await initializeMediaStream({ audio: true });
             if (!audioStream) {
               setIsAudioEnabled(false);
+              stopAllTracks();
             }
           } else {
-            if (videoRef.current) {
-              videoRef.current.srcObject = null;
-            }
-            streamRef.current = null;
+            stopAllTracks();
           }
         }
         setIsVideoEnabled(false);
       }
     } catch (error) {
       console.error('Error toggling video:', error);
+      stopAllTracks();
+      setIsVideoEnabled(false);
     }
   };
 
@@ -191,24 +206,25 @@ const InterviewPage: React.FC = () => {
           const audioTrack = streamRef.current.getAudioTracks()[0];
           if (audioTrack) {
             audioTrack.stop();
+            audioTrack.enabled = false;
           }
           
           if (isVideoEnabled) {
             const videoStream = await initializeMediaStream({ video: true });
             if (!videoStream) {
               setIsVideoEnabled(false);
+              stopAllTracks();
             }
           } else {
-            if (videoRef.current) {
-              videoRef.current.srcObject = null;
-            }
-            streamRef.current = null;
+            stopAllTracks();
           }
         }
         setIsAudioEnabled(false);
       }
     } catch (error) {
       console.error('Error toggling audio:', error);
+      stopAllTracks();
+      setIsAudioEnabled(false);
     }
   };
 
