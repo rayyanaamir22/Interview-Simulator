@@ -10,9 +10,10 @@ declare global {
 interface ClosedCaptionsProps {
   isEnabled: boolean;
   audioStream: MediaStream | null;
+  onTranscript?: (text: string) => void;
 }
 
-const ClosedCaptions: React.FC<ClosedCaptionsProps> = ({ isEnabled, audioStream }) => {
+const ClosedCaptions: React.FC<ClosedCaptionsProps> = ({ isEnabled, audioStream, onTranscript }) => {
   const [transcript, setTranscript] = useState<string>('');
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +61,11 @@ const ClosedCaptions: React.FC<ClosedCaptionsProps> = ({ isEnabled, audioStream 
             return sentences.slice(-3).join('. ') + '.';
           });
         }
+
+        // Call onTranscript with the final transcript
+        if (event.results[current].isFinal && onTranscript) {
+          onTranscript(transcript);
+        }
       };
 
       recognition.onerror = (event: any) => {
@@ -94,7 +100,7 @@ const ClosedCaptions: React.FC<ClosedCaptionsProps> = ({ isEnabled, audioStream 
         recognitionRef.current = null;
       }
     };
-  }, [isEnabled, audioStream]);
+  }, [isEnabled, audioStream, onTranscript]);
 
   if (!isEnabled) return null;
 

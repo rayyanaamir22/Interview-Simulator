@@ -45,6 +45,11 @@ const InterviewPage: React.FC = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<any>(null);
 
+  // Add new state for AI response
+  const [aiResponse, setAiResponse] = useState<string>('');
+  const [isAiResponding, setIsAiResponding] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+
   // Initialize interview
   useEffect(() => {
     document.title = 'Interview Simulator | Session';
@@ -68,8 +73,27 @@ const InterviewPage: React.FC = () => {
     startTimer();
     startStatusPolling();
 
+    // Initialize WebSocket connection
+    wsRef.current = new WebSocket('ws://localhost:8000/ws/interview');
+
+    wsRef.current.onmessage = (event) => {
+      const response = event.data;
+      setAiResponse(prev => prev + response);
+    };
+
+    wsRef.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    wsRef.current.onclose = () => {
+      console.log('WebSocket connection closed');
+    };
+
     return () => {
       cleanup();
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
     };
   }, [navigate]);
 
@@ -280,6 +304,15 @@ const InterviewPage: React.FC = () => {
     },
   ];
 
+  // Function to send user speech to AI
+  const sendToAI = (text: string) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      setIsAiResponding(true);
+      setAiResponse(''); // Clear previous response
+      wsRef.current.send(text);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation Bar */}
@@ -338,6 +371,23 @@ const InterviewPage: React.FC = () => {
         </div>
       </main>
 
+      {/* AI Response Section */}
+      <div className="fixed bottom-20 left-0 right-0 bg-white shadow-md p-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-gray-50 rounded-lg p-4 min-h-[100px] max-h-[200px] overflow-y-auto">
+            {isAiResponding ? (
+              <div className="text-gray-700">
+                {aiResponse || 'Interviewer is typing...'}
+              </div>
+            ) : (
+              <div className="text-gray-400 italic">
+                Waiting for your response...
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Bottom Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white shadow-md p-4 h-20">
         <div className="flex justify-center space-x-6 h-full items-center">
@@ -366,6 +416,11 @@ const InterviewPage: React.FC = () => {
       <ClosedCaptions 
         isEnabled={isCaptionsEnabled && isAudioEnabled} 
         audioStream={streamRef.current}
+        onTranscript={(text) => {
+          if (text) {
+            sendToAI(text);
+          }
+        }}
       />
     </div>
   );
